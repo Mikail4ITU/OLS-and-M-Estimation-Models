@@ -1,0 +1,273 @@
+---
+title: "SM_TP6_Homework_Mikail_Kurt"
+author: "Mikail Kurt"
+date: "10/25/2020"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+
+
+#Clean environment and set path
+
+```{r clean environment and set path}
+rm(list = ls()) # clean environment
+cat("\014") # clean console
+
+```
+
+#Setting working directory and loading datasets
+
+```{r Setting working directory and loading datasets}
+setwd('C:/Users/new/Desktop/UNIGE/Msc.Business Analytics/Statistical Modelling/Practical 5-20201025') #set the folder containing dataset as your working directory
+conso = read.table("conso.txt", header=TRUE)
+ciga = read.table("ciga.txt", header=TRUE)
+source("VIF.R")
+source("R2wRob.R")
+```
+
+
+
+#Installing required packages 
+
+```{r}
+library(robust) 
+```
+
+
+#Exploratory Data Analysis(EDA)
+
+```{r}
+head(conso) #Displaying first 6 rows of dataset 
+dim(conso) #Dimensions of dataset
+pairs(conso)#There is positive linearity between response variable of consumption and the variable license also relatively little with paved. In addition there negative linearity between response variable with income and tax variables. There is not meaningful relationship to ID and const variables therefore we will remove them.
+summary(conso) #Summary of each variable
+str(conso) #structure of data 48 Obs & 7 variables 
+#Exploratory Data Analysis of each predictor
+describe(conso) #Very useful function from Hmsic package to detech n of obs, distinct elements, missng values etc. 
+
+boxplot(conso$ID,main="ID",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,50))
+boxplot(conso$const,main="const",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,2))
+boxplot(conso$tax,main="Tax",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(3,15))
+boxplot(conso$income,main="Income",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(3000,5500))
+boxplot(conso$paved,main="Paved",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(300,20000))
+boxplot(conso$license,main="License",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,1))
+boxplot(conso$consumption,main="Consumption",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(300,1000))
+
+#Overall there are few outliers among predictors. 
+```
+
+
+#Normality Check
+
+```{r}
+require(ellipse)
+plotcorr(cor(conso[, 1:7], method="spearman"))
+qqnorm(conso$consumption,pch = 1)
+qqline(conso$consumption, col = "steelblue", lwd = 2) #As all the points fall approximately along this reference line excluding couple of outliers, we can assume normality within dataset.
+
+```
+#Computation of variance inflation factors
+
+```{r}
+#VIF(conso[,1:6],conso[,7]) 
+#We got error of "Error in vif.lm.car(fit.lm) : there are aliased coefficients in the model" because of const variable. 
+```
+
+
+
+```{r}
+conso.new <- conso[,-c(1,2)] #ID and const variables are removed
+VIF(conso.new[,1:4],conso.new[,5]) #After removing the ID and const variable the VIF computed without errors. The result shows that there is no risk of multi collinearity. 
+```
+
+
+#Ordinary Least Square(OLS) & M-Estimation Models
+
+```{r}
+conso.ls <- lm(consumption ~ tax + income + paved + license,data = conso.new)  #ordinary least square model
+conso.m90 = lmRob(consumption ~ tax + income + paved + license,data = conso.new) #M-Estimation model with default 90% Efficiency
+
+summary(conso.ls)
+summary(conso.m90)
+
+
+conso.lsm90<- fit.models(conso.ls,conso.m90) #fitting two models
+conso.lsm90
+R2wRob(conso.m90)
+
+# What are the estimated values for the βj s using classic (LS) and robust (M-estimation) estimation?
+#For ordinary linear regression, beta_0 is 377.291146, and beta_1 is -34.790149. For M estimation,beta_0 is 456.730208, and beta_1 is -15.937399.
+# How do you interpret them?
+#The significance level of M-estimation intercept is higher than classic model. 
+# Are the parameters significant?
+#For ordinary linear regression, all the variables are significant except paved. For M estimation, license and income variables are important.
+# How large are the R2  for your models (classic and robust)? How do you interpret them?
+#For ordinary linear regression,Adjusted R-squared:0.6488. For M estimation, Robust adjusted R-squared:0.75381.
+#In terms of R2 the robust model produced better result. That means that the fitted regression line of robust model is closer to the data. 
+# How do you interpret the ‘Test of Bias’ results?
+#A small p-value indicates a large proportion of contaminated data. The p-value of Test for Bias(M-Estimation) is 0.85 and for classic model is 0.43.
+
+```
+
+#Residual Analysis
+
+```{r}
+#  Residuals analysis
+
+# One of the assumptions for hypothesis testing is that the errors follow a Gaussian distribution. As a consequence the residuals should as well. The residual summary statistics give information about the symmetry of the residual distribution. The median should be close to 0
+
+#  Fitted values V.S. residuals
+plot.lmRob(conso.ls, which.plots=4, id.n=10)
+plot.lmRob(conso.m90, which.plots=4, id.n=10) #We can say that the variance assumption of residuals can be accepted.
+
+#  Normal Q-Q plot of residuals
+plot.lmRob(conso.ls, which.plots=1, id.n=10, envelope=FALSE)# The residuals are roughly normally distributed. 
+plot.lmRob(conso.m90, which.plots=1, id.n=10, envelope=FALSE) #There is three outliers(45,19,40) which is not aligning with normal distribution. We can say that the residuals are not normally distributed.
+
+# for ls estimation
+par(mfrow=c(2,2))
+plot(conso.ls)
+
+
+#Autocorrelations
+par(mfrow=c(1,1))
+acf(resid(conso.ls))
+acf(resid(conso.m90))
+
+# Both of the two acf plots show that there is no evidence of autocorrelations between the residuals
+
+```
+
+
+#(Ciga.txt)
+
+#Exploratory Data Analysis(EDA)
+
+```{r}
+head(ciga) #Displaying first 6 rows of dataset 
+dim(ciga) #Dimensions for dataset
+describe(ciga) #Very useful function from Hmsic package to detech n of obs, distinct elements, missng values etc. 
+
+summary(ciga) #Summary of each variable
+str(ciga) #structure of data 25 Obs & 5 variables.
+
+#Boxplots
+
+boxplot(ciga$goudron,main="Goudron",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,50))
+boxplot(ciga$nicotine,main="Nicotine",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,3))
+boxplot(ciga$poids,main="Poids",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,2))
+boxplot(ciga$CO,main="CO",col="bisque",medcol="red",boxlty=0,border="black",
+        whisklty=1,staplelwd=4,outpch=13,outcex=1,outcol="dark blue", ylim=c(0,25))
+
+#Overall there are few outliers among predictors. 
+
+```
+
+
+
+#Normality Check
+
+```{r}
+
+pairs(ciga[, 2:5]) #Pairs of plots without marque varibale because it's class string.
+require(ellipse)
+plotcorr(cor(ciga[, 2:5], method="spearman"))
+qqnorm(ciga$CO,pch = 1)
+qqline(ciga$CO, col = "steelblue", lwd = 2) #The response variable CO has strong correlation with predictors goudron and nicotine.In addition there is strong correlation between nicotine and goudron which may cause multicollinearity, we will compute VIF to check if there is a risk multicollinearity.As all the points fall approximately along this reference line excluding couple of outliers, we can assume normality within dataset.
+```
+
+
+
+#Computation of variance inflation factors
+
+```{r}
+ciga.new <- ciga[,-c(1:2)] #First column is not numeric so it has npt effect on regression. As we see from the scatter plot goudron and nicotine is highly correlated. Therefore I removed marque and goudron variables. 
+VIF(ciga[,2:4],ciga[,5]) #VIF result is 14.95 therefore there is high risk of multicollinearity. 
+VIF(ciga.new[,1:2],ciga.new[,3]) #VIF is 1.33 there is no risk multicollinearty anymore. 
+```
+
+ 
+#Ordinary Least Square(OLS) Model
+
+```{r}
+options(scipen = 9999)
+ciga.ls = lm(CO ~ nicotine + poids,data = ciga.new) #ordinary least square model
+summary(ciga.ls) #nicotine variable is significant, even the poids variable can be eliminated. 
+```
+
+
+#M-Estimation Model
+
+```{r}
+ciga.m90 = lmRob(CO ~ nicotine + poids,data = ciga.new) #ordinary least square model
+summary(ciga.m90)
+
+R2wRob(ciga.m90)
+ciga.lsm90<- fit.models(ciga.ls,ciga.m90) 
+ciga.lsm90
+summary(ciga.lsm90)
+
+# What are the estimated values for the βj s using classic (LS) and robust (M-estimation) estimation?
+#For ordinary linear regression, beta_0 is 1.614, and beta_1 is 12.388. For M estimation,beta_0 is -2.761, and beta_1 is 14.602.
+# How do you interpret them?
+#The significance level of M-estimation intercept is lower than classic model. 
+# Are the parameters significant?
+#Both for ordinary linear regression and M estimation, nicotine is very significant variable. 
+# How large are the R2
+# for your models (classic and robust)? How do you interpret them?
+#For ordinary linear regression,Adjusted R-squared:  0.8444. For M estimation,Robust adjusted R-squared: 0.900818. The robust model perform better than M-Estimation.In terms of R2 the robust model produced better result. That means that the fitted regression line of robust model is closer to the data. 
+# How do you interpret the ‘Test of Bias’ results?
+#A small p-value indicates a large proportion of contaminated data. The p-value of Test for Bias(M-Estimation) is  0.6661 and for classic model is  0.6878. The value of classic model is slightly higher. 
+
+```
+ 
+#Residual Analysis 
+
+```{r}
+#  Residuals analysis
+# One of the assumptions for hypothesis testing is that the errors follow a Gaussian distribution. As a consequence the residuals should as well. The residual summary statistics give information about the symmetry of the residual distribution. The median should be close to 0
+
+#  Fitted values V.S. residuals
+plot.lmRob(ciga.ls, which.plots=4, id.n=10)
+plot.lmRob(ciga.m90, which.plots=4, id.n=10) #Except the outliers we can say that the variance assumption of residuals can be accepted.
+
+#  Normal Q-Q plot of residuals
+plot.lmRob(ciga.ls, which.plots=1, id.n=10, envelope=FALSE) #In the classic model residuals are roughly normally distributed. 
+plot.lmRob(ciga.m90, which.plots=1, id.n=10, envelope=FALSE) #Again in the robust model residuals are roughly normally distributed except one outlier(3).
+
+# for ls estimation
+par(mfrow=c(2,2))
+plot(ciga.ls)
+par(mfrow=c(1,1))
+
+#Autocorrelations
+acf(resid(ciga.ls))
+acf(resid(ciga.m90))
+# Both of the two acf plots show that there is no evidence of autocorrelations between the residuals
+```
+
